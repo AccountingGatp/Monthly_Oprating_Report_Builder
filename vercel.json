@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/(.*)",
-      "destination": "/Monthly_Operating_Report_Builder Final.html"
+      "destination": "/Monthly_Operating_Report_Builder_final_neww.html"
     }
   ]
 }
