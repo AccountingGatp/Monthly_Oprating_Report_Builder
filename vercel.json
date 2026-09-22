@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/CCA_AR_Validation.html"
+    }
+  ]
+}
