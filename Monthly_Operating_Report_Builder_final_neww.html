@@ -141,7 +141,19 @@ label{display:grid;gap:3px;font-size:12px;color:var(--muted)}
         <button class="btn" id="saveBtn" type="button" hidden>Save PDF</button>
         <span id="saveNote" class="sub"></span>
       </div>
-      <div id="genNote" class="note"></div>
+      <div style="margin:16px 0;padding:14px;border:1px solid #dde3e1;border-radius:10px;background:#fff">
+  <button type="button" class="btn" id="editIndexBtn" aria-expanded="false">Edit Report Index</button>
+  <div id="indexEditor" hidden style="margin-top:12px">
+    <p class="sub">Edit the table-of-contents labels for this report. Changes are saved in this browser (no database required). The actual report sections remain unchanged.</p>
+    <div id="indexFields" style="display:grid;gap:8px"></div>
+    <div class="row" style="margin-top:12px">
+      <button type="button" class="btn primary" id="saveIndexBtn">Save Index</button>
+      <button type="button" class="btn" id="resetIndexBtn">Reset Default</button>
+    </div>
+    <span id="indexStatus" class="sub" role="status"></span>
+  </div>
+</div>
+<div id="genNote" class="note"></div>
       <p class="src" style="margin:0">Order: cover, contents, Executive Summary, P&amp;L, 12-month recap, budget variance, balance sheet, cash flow, general ledger, rent roll, deposits, receivables, AP aging, check register, bank reconciliation, operating bank statement, money market statement, mortgage. Excel reports are re-set in ResMan layout; PDFs are included as they are.</p>
     </section>
   </div>
@@ -183,6 +195,50 @@ const SECTIONS = [
   { k: 'mtg',  toc: 'Mortgage Statement',                  kind: 'pdf',  label: 'Mortgage Statement' },
 ];
 const TOC = ['Executive Summary', 'Profit and Loss', 'P&L 12 Month Recap', 'Budget Variance', 'Balance Sheet Comparison', 'Cash Flow', 'General Ledger', 'Rent Roll Analysis', 'Security Deposit Listing', 'Aged Receivables', 'AP Aging Summary', 'Check Register', 'Bank Reconciliations and Statements', 'Mortgage Statement'];
+const DEFAULT_TOC = [...TOC];
+const INDEX_STORAGE_KEY = 'monthly-report-custom-index-v1';
+try {
+  const saved = JSON.parse(localStorage.getItem(INDEX_STORAGE_KEY) || 'null');
+  if (Array.isArray(saved) && saved.length === TOC.length && saved.every(x => typeof x === 'string' && x.trim())) {
+    saved.forEach((label, i) => { TOC[i] = label; });
+  }
+} catch (e) { /* Private browsing or unavailable storage: use defaults. */ }
+function initIndexEditor() {
+  const panel = $('indexEditor'), fields = $('indexFields');
+  const draw = () => {
+    fields.replaceChildren();
+    TOC.forEach((name, i) => {
+      const label = document.createElement('label');
+      label.style.cssText = 'display:grid;grid-template-columns:35px minmax(0,1fr);gap:8px;align-items:center';
+      const num = document.createElement('span'); num.textContent = (i + 1) + '.';
+      const input = document.createElement('input');
+      input.type = 'text'; input.value = name; input.maxLength = 110; input.dataset.index = String(i);
+      input.style.cssText = 'width:100%;box-sizing:border-box;padding:9px;border:1px solid #dde3e1;border-radius:6px';
+      input.setAttribute('aria-label', 'Index entry ' + (i + 1));
+      label.append(num, input); fields.append(label);
+    });
+  };
+  $('editIndexBtn').addEventListener('click', () => {
+    panel.hidden = !panel.hidden;
+    $('editIndexBtn').setAttribute('aria-expanded', String(!panel.hidden));
+    if (!panel.hidden) draw();
+  });
+  $('saveIndexBtn').addEventListener('click', () => {
+    const next = [...fields.querySelectorAll('input')].map(x => x.value.trim());
+    if (next.length !== DEFAULT_TOC.length || next.some(x => !x)) {
+      $('indexStatus').textContent = 'Every index entry needs a name.'; return;
+    }
+    next.forEach((v,i) => { TOC[i] = v; });
+    try { localStorage.setItem(INDEX_STORAGE_KEY, JSON.stringify(TOC)); $('indexStatus').textContent = 'Index saved in this browser. New PDFs will use these labels.'; }
+    catch (e) { $('indexStatus').textContent = 'Index applied for this session; browser storage is unavailable.'; }
+  });
+  $('resetIndexBtn').addEventListener('click', () => {
+    DEFAULT_TOC.forEach((v,i) => { TOC[i] = v; });
+    try { localStorage.removeItem(INDEX_STORAGE_KEY); } catch (e) {}
+    draw(); $('indexStatus').textContent = 'Default index restored.';
+  });
+}
+initIndexEditor();
 const SEC = Object.fromEntries(SECTIONS.map((s) => [s.k, s]));
 
 function classify(name) {
