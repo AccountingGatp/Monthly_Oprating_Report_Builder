@@ -842,27 +842,56 @@ function imgDims(dataUrl) { return new Promise((res) => { const i = new Image();
 function imgType(dataUrl) { return /^data:image\/png/.test(dataUrl) ? 'PNG' : 'JPEG'; }
 async function renderCover(meta) {
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
-  doc.setLineWidth(0.8); doc.setDrawColor(0); doc.rect(24, 24, 564, 744);
-  const place = async (url, boxW, boxH, top) => {
-    const [w, h] = await imgDims(url); const s = Math.min(boxW / w, boxH / h); const dw = w * s, dh = h * s;
-    doc.addImage(url, imgType(url), (612 - dw) / 2, top + (boxH - dh) / 2, dw, dh);
-  };
-  if (S.logo) await place(S.logo, 205, 200, 130);
-  if (S.photo) await place(S.photo, 305, 205, 368);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(12.5); doc.setTextColor(115);
-  doc.text('Monthly Operating Report', 306, 662, { align: 'center' });
-  doc.text(meta.property, 306, 694, { align: 'center' });
-  doc.setFont('times', 'bold'); doc.setFontSize(11.5); doc.setTextColor(0);
-  doc.text(meta.month, 306, 740, { align: 'center' });
+  const NAVY=[22,51,75], GOLD=[189,155,94];
+  doc.setFillColor(...NAVY); doc.rect(0,0,612,792,'F');
+  doc.setFillColor(...GOLD); doc.rect(0,0,612,14,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(11.2); doc.setTextColor(255,255,255);
+  // No white bar or additional slogan: company name printed directly on the navy background.
+  const company=String(meta.company||'').trim();
+  if(company) doc.text(doc.splitTextToSize(company.toUpperCase(),425).slice(0,2),42,54);
+  // Retain the original PMG logo or the logo selected by the user.
+  if(S.logo) {
+    const [w,h]=await imgDims(S.logo);
+    const z=Math.min(74/w,74/h);
+    doc.addImage(S.logo,imgType(S.logo),501+(74-w*z)/2,27+(74-h*z)/2,w*z,h*z);
+  }
+  if(S.photo) {
+    const [w,h]=await imgDims(S.photo);
+    const z=Math.min(528/w,352/h),dw=w*z,dh=h*z;
+    doc.addImage(S.photo,imgType(S.photo),42+(528-dw)/2,125+(352-dh)/2,dw,dh);
+  }
+  doc.setFillColor(...GOLD);doc.rect(42,491,70,5,'F');
+  doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(29);
+  doc.text(doc.splitTextToSize(String(meta.property||'').trim(),520).slice(0,2),42,554);
+  doc.setFont('helvetica','normal');doc.setFontSize(19);doc.text('Monthly Operating Report',42,587);
+  const period=String(meta.month||'').trim();
+  doc.setFont('helvetica','bold');doc.setFontSize(14);doc.text(period.toUpperCase(),42,630);
+  doc.setDrawColor(...GOLD);doc.setLineWidth(.7);doc.line(42,686,570,686);
+  const m=period.match(/^(January|February|March|April|May|June|July|August|September|October|November|December)\s+(20\d{2})$/i);
+  if(m){
+    const names=['january','february','march','april','may','june','july','august','september','october','november','december'];
+    const mo=names.indexOf(m[1].toLowerCase()), y=Number(m[2]),last=new Date(y,mo+1,0).getDate();
+    doc.setFont('helvetica','normal');doc.setFontSize(9.5);
+    doc.text('Reporting period: '+m[1]+' 1 - '+last+', '+y,42,707);
+  }
   return doc.output('arraybuffer');
 }
 function renderTOC(entries) {
-  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
-  doc.setLineWidth(0.8); doc.rect(24, 24, 564, 744);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(120);
-  doc.text('T A B L E    O F    C O N T E N T S', 306, 130, { align: 'center' });
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(110);
-  entries.forEach((t, i) => { const y = 177 + i * 25; doc.text(`${i + 1}.`, 92, y); doc.text(t.name, 141, y); });
+  const doc=new jsPDF({unit:'pt',format:'letter'});
+  const NAVY=[22,51,75],GOLD=[189,155,94];
+  doc.setFillColor(...NAVY);doc.rect(0,0,612,792,'F');
+  doc.setFillColor(...GOLD);doc.rect(0,0,612,14,'F');
+  doc.setFont('helvetica','bold');doc.setFontSize(19);doc.setTextColor(255,255,255);
+  doc.text('TABLE OF CONTENTS',42,76);
+  doc.setFillColor(...GOLD);doc.rect(42,91,70,4,'F');
+  entries.forEach((entry,i)=>{
+    const y=137+i*34;if(y>742)return;
+    doc.setFont('helvetica','bold');doc.setFontSize(10.5);doc.setTextColor(...GOLD);
+    doc.text(String(i+1).padStart(2,'0'),44,y);
+    doc.setFont('helvetica','normal');doc.setTextColor(255,255,255);
+    doc.text(doc.splitTextToSize(entry.name,468)[0],89,y);
+    doc.setDrawColor(75,94,109);doc.setLineWidth(.4);doc.line(42,y+12,570,y+12);
+  });
   return doc.output('arraybuffer');
 }
 
