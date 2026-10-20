@@ -1012,21 +1012,28 @@ async function build() {
     const grouped = id => id==='rec' ? ['rec','stmt','mm'] : [id];
     const included = selected.filter(e=>e.id==='exec'||grouped(e.id).some(k=>S.files.some(f=>f.section===k)));
     parts.push(await step('Drawing cover…', () => renderCover(meta)));
+    // Index only the sections with matching uploaded reports.
     parts.push(await step('Drawing contents…', () => renderTOC(included)));
+    const renderedSectionIds = new Set();
     for(const entry of selected){
       if(entry.id==='exec'){parts.push(await step('Building Executive Summary…',()=>renderExec(K,meta)));continue;}
       let count=0;
       for(const key of grouped(entry.id)){
         const sec=SEC[key];
         for(const f of S.files.filter(f=>f.section===key)){
-          if(/\\.pdf$/i.test(f.name)){parts.push(f.bytes);count++;}
-          else if(xl[key] && P[key] && /\\.xls[xm]$/i.test(f.name)){
+          if(/\.pdf$/i.test(f.name)){parts.push(f.bytes);count++;}
+          else if(xl[key] && P[key] && /\.xls[xm]$/i.test(f.name)){
             parts.push(await step('Formatting '+sec.label+'…',()=>xl[key](P[key])));count++;
           }else skipped.push(sec.label+' ('+f.name+' is not a supported format)');
         }
       }
-      if(!count)skipped.push(entry.name+' (no uploaded files)');
+      if(count)renderedSectionIds.add(entry.id);
+      else skipped.push(entry.name+' (no uploaded files)');
     }
+    // Never produce a cover-only or summary-only report when source sections were uploaded.
+    const available = selected.filter(e => e.id !== 'exec' && grouped(e.id).some(k => S.files.some(f => f.section === k)));
+    const missingRendered = available.filter(e => !renderedSectionIds.has(e.id));
+    if (missingRendered.length) throw new Error('Report sections were not added: ' + missingRendered.map(e => e.name).join(', ') + '. Please check each file format and assignment.');
     setStatus('Merging pages…'); await new Promise((r) => setTimeout(r, 20));
     const out = await PDFLib.PDFDocument.create();
     for (const b of parts) { const src = await PDFLib.PDFDocument.load(b, { ignoreEncryption: true }); const pages = await out.copyPages(src, src.getPageIndices()); pages.forEach((p) => out.addPage(p)); }
